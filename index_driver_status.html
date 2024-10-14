@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Management</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+        .profile-section, .register-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .profile-picture {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+        .tabs-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .MuiTab-root {
+            flex-grow: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+        }
+        .MuiTab-root.Mui-selected {
+            background-color: #ddd;
+            font-weight: bold;
+        }
+        .MuiTab-root.disabled {
+            pointer-events: none;
+            background-color: #ccc;
+        }
+        .hidden {
+            display: none;
+        }
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        .alert {
+            color: red;
+            margin: 5px;
+        }
+        .chiclet {
+            margin-top: 5px;
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            color: white;
+        }
+        .chiclet-available {
+            background-color: green;
+        }
+        .chiclet-not-available {
+            background-color: grey;
+        }
+        .mui-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .mui-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+
+<h1>Driver Management</h1>
+
+<!-- Tab Menu -->
+<div class="tabs-container">
+    <div id="tab1" class="MuiTab-root Mui-selected" onclick="showTab('tab1')">Open Job</div>
+    <div id="tab2" class="MuiTab-root" onclick="showTab('tab2')">Task</div>
+    <div id="tab3" class="MuiTab-root" onclick="showTab('tab3')">Register</div>
+</div>
+
+<!-- Open Job tab -->
+<div id="tab1-content" class="tab-content">
+    <!-- Profile Section -->
+    <div class="profile-section">
+        <img id="profilePicture" src="" class="profile-picture" alt="Profile Picture">
+        <h3 id="driverName"></h3>
+        <p>Driver ID: <span id="driverId"></span></p>
+        <div class="chiclet" id="statusChiclet">Not available</div>
+    </div>
+
+    <!-- Availability Toggle -->
+    <div class="form-group">
+        <label class="MuiFormLabel-root">Available</label><br>
+        <label class="mui-switch">
+            <input type="checkbox" id="availabilityToggle" onclick="toggleSwitch(this)">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <!-- Truck Dropdown -->
+    <div class="form-group">
+        <label class="MuiFormLabel-root" for="truckSelect">Select Truck:</label><br>
+        <select id="truckSelect" class="MuiInputBase-root MuiOutlinedInput-root MuiSelect-root">
+            <option value="">--Select Truck--</option>
+        </select>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="form-group">
+        <button id="submitAvailability" class="MuiButtonBase-root MuiButton-root MuiButton-containedPrimary" onclick="submitAvailability()">Submit</button>
+    </div>
+</div>
+
+<!-- Task tab -->
+<div id="tab2-content" class="tab-content hidden">
+    <h3>Task List</h3>
+    <!-- Task table omitted for brevity -->
+</div>
+
+<!-- Register tab -->
+<div id="tab3-content" class="tab-content hidden register-section">
+    <h3>Register New Driver</h3>
+    <input type="text" id="lineId" class="input-field" placeholder="Line ID" disabled>
+    <input type="text" id="lineName" class="input-field" placeholder="Line Name" disabled>
+    <input type="text" id="registerDriverName" class="input-field" placeholder="Driver Name">
+    <input type="text" id="driverMobile" class="input-field" placeholder="Driver Mobile">
+    <button onclick="submitDriverRegistration()">Submit</button>
+    <div id="registrationAlert" class="alert"></div>
+</div>
+
+<script>
+let driverId = null;
+
+document.addEventListener("DOMContentLoaded", function () {
+    liff.init({ liffId: "2005786037-0DW7REEv" }).then(() => {
+        console.log('LIFF initialized');
+        initializeApp();
+    }).catch(err => {
+        console.error('LIFF Initialization failed', err);
+    });
+
+    document.getElementById('submitAvailability').addEventListener('click', submitAvailability);
+});
+
+function initializeApp() {
+    liff.getProfile().then(profile => {
+        // Display profile picture and name in the Open Job tab
+        document.getElementById('profilePicture').src = profile.pictureUrl; 
+        document.getElementById('driverName').textContent = profile.displayName;
+        document.getElementById('lineId').value = profile.userId; 
+        document.getElementById('lineName').value = profile.displayName; 
+        checkDriverStatus(profile.userId);
+    }).catch(err => console.error('Error getting profile:', err));
+}
+
+function checkDriverStatus(lineId) {
+    // Check if the driver exists in the database
+    fetch('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_drivers')
+        .then(response => response.json())
+        .then(data => {
+            const driver = data.find(d => d.lineId === lineId);
+            if (driver) {
+                driverId = driver.id;
+                document.getElementById('driverId').textContent = driver.id;
+                showTab('tab1');
+                document.getElementById('tab3').classList.add('disabled'); // Disable Register tab
+                populateTruckDropdown(driverId);
+                fetchDriverStatus(driverId);
+            } else {
+                showTab('tab3');
+                document.getElementById('tab1').classList.add('disabled'); // Disable Open Job tab
+                document.getElementById('tab2').classList.add('disabled'); // Disable Task tab
+            }
+        })
+        .catch(err => console.error('Error fetching driver data:', err));
+}
+
+function showTab(tabName) {
+    document.querySelectorAll('.MuiTab-root').forEach(tab => {
+        tab.classList.remove('Mui-selected');
+    });
+    document.getElementById(tabName).classList.add('Mui-selected');
+    
+    document.querySelectorAll('.tab-content').forEach(tabContent => {
+        tabContent.classList.add('hidden');
+    });
+    document.getElementById(tabName + '-content').classList.remove('hidden');
+}
+
+// Submit the driver registration form
+function submitDriverRegistration() {
+    const lineId = document.getElementById('lineId').value;
+    const lineName = document.getElementById('lineName').value;
+    const driverName = document.getElementById('registerDriverName').value;
+    const driverMobile = document.getElementById('driverMobile').value;
+
+    console.log({
+        lineId: lineId,
+        lineName: lineName,
+        driverName: driverName,
+        driverMobile: driverMobile
+    });
+
+    // POST API to register driver
+    fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_drivers_to_driver_status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            lineId: lineId,
+            lineName: lineName,
+            driverName: driverName,
+            driverMobile: driverMobile
+        })
+    })
+    .then(response => {
+        return response.json().then(data => ({
+            status: response.status,
+            body: data
+        }));
+    })
+    .then(({status, body}) => {
+        if (status === 200) {
+            // Show flex message and close LIFF
+            liff.sendMessages([{
+                'type': 'text',
+                'text': 'คุณได้ดำเนินการลงทะเบียนพนักงานขับรถเรียบร้อยแล้ว กรุณาแจ้งเจ้าหน้าที่เพื่อทำการเพิ่มข้อมูลส่วนตัวและตรวจสอบความพร้อมก่อนเริ่มงาน'
+            }]).then(() => {
+                liff.closeWindow();
+            }).catch((err) => {
+                console.error('Error sending message:', err);
+            });
+        } else {
+            console.error('Failed to register driver:', body);
+            document.getElementById('registrationAlert').textContent = `Failed to register driver: ${body.error || body.message}`;
+            alert('Failed to register driver');
+        }
+    })
+    .catch(err => {
+        console.error('Error during driver registration:', err);
+        document.getElementById('registrationAlert').textContent = 'Error during registration: ' + err.message;
+    });
+}
+
+function submitAvailability() {
+    const driverStatus = document.getElementById('availabilityToggle').checked ? 'Available' : 'Not available';
+    const selectedTruckId = document.getElementById('truckSelect').value;
+
+    fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_driver_status_by_driver_id`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            driverId: driverId,
+            driverStatus: driverStatus,
+            truckId: parseInt(selectedTruckId)
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            alert('Status updated successfully.');
+        } else {
+            alert('Failed to update status.');
+        }
+    })
+    .catch(err => {
+        console.error('Error updating status:', err);
+        alert('Error updating status.');
+    });
+}
+
+function fetchDriverStatus(driverId) {
+    fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_driver_status_by_driver_id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId: driverId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data) {
+            const toggle = document.getElementById('availabilityToggle');
+            const chiclet = document.getElementById('statusChiclet');
+            toggle.checked = data.driverStatus === "Available";
+            chiclet.textContent = data.driverStatus;
+            chiclet.classList.toggle("chiclet-available", toggle.checked);
+            chiclet.classList.toggle("chiclet-not-available", !toggle.checked);
+        }
+    })
+    .catch(err => console.error('Error fetching driver status:', err));
+}
+
+function populateTruckDropdown(driverId) {
+    fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_drivers/${driverId}`)
+        .then(response => response.json())
+        .then(data => {
+            const trucks = data.trucks;
+            const truckSelect = document.getElementById('truckSelect');
+            truckSelect.innerHTML = '<option value="">--Select Truck--</option>'; // Reset dropdown
+            trucks.forEach(truckId => {
+                fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_trucks/${truckId}`)
+                    .then(response => response.json())
+                    .then(truckData => {
+                        const option = document.createElement('option');
+                        option.value = truckData.id;
+                        option.text = truckData.truckNo;
+                        truckSelect.appendChild(option);
+                    }).catch(err => console.error('Error fetching truck data:', err));
+            });
+        }).catch(err => console.error('Error fetching trucks:', err));
+}
+
+</script>
+
+</body>
+</html>

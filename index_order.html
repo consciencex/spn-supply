@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>กรุณากรอกข้อมูลเพื่อยืนยันคำสั่ง</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f4f4f9;
+    }
+    .title-container {
+      max-width: 480px;
+      margin: auto;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 80%;
+    }
+    h6, h10 {
+      text-align: center;
+    }
+    .form-container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      display: none;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .profile-info {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .profile-info img {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+    }
+    .profile-info p {
+      margin: 5px 0;
+    }
+    .loading {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .btn-primary {
+      width: 100%;
+    }
+    .progress-bar {
+      display: none;
+      width: 100%;
+      height: 30px;
+      background-color: #f3f3f3;
+      border-radius: 5px;
+      margin-top: 20px;
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      width: 0;
+      background-color: #4caf50;
+      animation: progressBar 2s linear forwards;
+    }
+    @keyframes progressBar {
+      to {
+        width: 100%;
+      }
+    }
+    .await-icon {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
+  <script>
+    let provinceData;
+    let currentOrderId = null; // Track the current order ID for edit functionality
+
+    async function initializeLiff() {
+      try {
+        await liff.init({ liffId: '2005786037-ZwX56JJQ' });
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+        } else {
+          const permissionGranted = await liff.permission.query('profile');
+          if (!permissionGranted) {
+            await liff.permission.request('profile');
+          }
+
+          // Fetch profile and proceed with form filling and other tasks
+          const profile = await liff.getProfile();
+          document.getElementById('displayName').textContent = profile.displayName;
+          document.getElementById('profilePicture').src = profile.pictureUrl;
+
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_refinery', 'spn_refineries_id', 'refineryName');
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_products', 'spn_products_id', 'productName');
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_tickets', 'spn_tickets_id', 'ticketName');
+          await fetchProvinceData();
+
+          const urlParams = new URLSearchParams(window.location.search);
+          const orderId = urlParams.get('orderId');
+          if (orderId) {
+            await loadOrderData(orderId);
+            addOrderIdLabel(orderId);
+            document.getElementById('submitBtn').value = 'อัพเดตข้อมูลคำสั่ง'; // Change button text to update
+          } else {
+            document.getElementById('submitBtn').value = 'ยืนยันคำสั่ง';
+          }
+
+        }
+      } catch (error) {
+        if (error.message === "The access token expired") {
+          liff.logout();
+          liff.login();
+        } else {
+          console.error('LIFF initialization failed', error);
+          alert('LIFF initialization failed: ' + error.message);
+          document.getElementById('loading').style.display = 'none';
+        }
+      }
+    }
+
+    async function fetchDropdownData(url, fieldId, key) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        const select = document.getElementById(fieldId);
+        data.forEach(item => {
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.text = item[key];
+          select.add(option);
+        });
+      } catch (error) {
+        console.error('Error fetching dropdown data:', error);
+      }
+    }
+
+    async function fetchProvinceData() {
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kongvut/thai-province-data/master/api_province_with_amphure_tambon.json');
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        provinceData = await response.json();
+        const provinceSelect = document.getElementById('province');
+        provinceData.forEach(province => {
+          const option = document.createElement('option');
+          option.value = province.name_th;
+          option.text = province.name_th;
+          provinceSelect.add(option);
+        });
+      } catch (error) {
+        console.error('Error fetching province data:', error);
+      }
+    }
+
+    function populateDistricts() {
+      const provinceSelect = document.getElementById('province');
+      const districtSelect = document.getElementById('district');
+      const selectedProvince = provinceSelect.value;
+      districtSelect.innerHTML = '<option value="">เลือกอำเภอ</option>';
+      const province = provinceData.find(prov => prov.name_th === selectedProvince);
+      if (province) {
+        province.amphure.forEach(amphure => {
+          const option = document.createElement('option');
+          option.value = amphure.name_th;
+          option.text = amphure.name_th;
+          districtSelect.add(option);
+        });
+      }
+      populateSubDistricts();
+    }
+
+    function populateSubDistricts() {
+      const districtSelect = document.getElementById('district');
+      const subDistrictSelect = document.getElementById('subDistrict');
+      const selectedDistrict = districtSelect.value;
+      subDistrictSelect.innerHTML = '<option value="">เลือกตำบล</option>';
+      const province = provinceData.find(prov => prov.amphure.some(amp => amp.name_th === selectedDistrict));
+      if (province) {
+        const amphure = province.amphure.find(amp => amp.name_th === selectedDistrict);
+        if (amphure) {
+          amphure.tambon.forEach(tambon => {
+            const option = document.createElement('option');
+            option.value = tambon.name_th;
+            option.text = tambon.name_th;
+            subDistrictSelect.add(option);
+          });
+        }
+      }
+    }
+
+    function formatDate(date) {
+      const options = { year: 'numeric', month: 'long', day: '2-digit' };
+      return new Date(date).toLocaleDateString('th-TH', options);
+    }
+
+    async function submitForm() {
+      try {
+        document.getElementById('submitBtn').style.display = 'none';
+        document.getElementById('awaitIcon').style.display = 'block';
+
+        const receiveDate = document.getElementById('receiveDate').value;
+        const buyerName = document.getElementById('buyerName').value;
+        const plant = document.getElementById('plant').value;
+        const spn_refineries_id = document.getElementById('spn_refineries_id').value;
+        const spn_products_id = document.getElementById('spn_products_id').value;
+        const spn_tickets_id = document.getElementById('spn_tickets_id').value;
+        const quantity = parseFloat(document.getElementById('quantity').value).toFixed(3);
+        const units = document.getElementById('units').value;
+        const province = document.getElementById('province').value;
+        const district = document.getElementById('district').value;
+        const subDistrict = document.getElementById('subDistrict').value;
+        const targetDate = document.getElementById('targetDate').value;
+        const spn_customers_id = document.getElementById('spn_customers_id').value;
+        const jobType = document.getElementById('jobType').value;
+
+        const profile = await liff.getProfile();
+        const userId = profile.userId;
+        const displayName = profile.displayName;
+
+        if (!receiveDate || !buyerName || !plant || !spn_refineries_id || !spn_products_id || !spn_tickets_id || !quantity || !units || !province || !district || !subDistrict) {
+          alert('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+          document.getElementById('submitBtn').style.display = 'block';
+          document.getElementById('awaitIcon').style.display = 'none';
+          return;
+        }
+
+        const orderPayload = {
+          lineId: userId,
+          lineName: displayName,
+          receiveDate: receiveDate,
+          buyerName: buyerName,
+          plant: plant,
+          spn_refineries_id: parseInt(spn_refineries_id),
+          spn_products_id: parseInt(spn_products_id),
+          spn_tickets_id: parseInt(spn_tickets_id),
+          quantity: quantity,
+          units: units,
+          province: province,
+          district: district,
+          subDistrict: subDistrict,
+          targetDate: targetDate,
+          spn_customers_id: parseInt(spn_customers_id) || null,
+          jobType: jobType || "0"
+        };
+
+        const url = currentOrderId 
+          ? `https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders/${currentOrderId}` 
+          : 'https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders';
+        const method = currentOrderId ? 'PATCH' : 'POST';
+
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(orderPayload)
+        });
+
+        if (!response.ok) {
+          const errorDetails = await response.text();
+          throw new Error('Network response was not ok: ' + errorDetails);
+        }
+
+        const result = await response.json();
+
+        if (!currentOrderId && result.result && result.result.id) {
+          currentOrderId = result.result.id;
+        }
+
+        const flexMessage = {
+          type: "flex",
+          altText: "ยืนยันคำสั่งสำเร็จ !",
+          contents: {
+            type: "bubble",
+            body: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: "ยืนยันคำสั่งสำเร็จ !",
+                  weight: "bold",
+                  size: "xl",
+                  margin: "md",
+                  align: "center"
+                },
+                {
+                  type: "text",
+                  text: "ข้อมูลพนักงานขนส่งและรถบรรทุก",
+                  size: "md",
+                  color: "#999999",
+                  margin: "md",
+                  align: "center"
+                },
+                {
+                  type: "text",
+                  text: "จะส่งให้ท่านภายใน 1-2 วันทำการ",
+                  size: "md",
+                  color: "#999999",
+                  margin: "xs",
+                  align: "center"
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "หมายเลข:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: `${currentOrderId}`, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "วันที่รับ:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: formatDate(receiveDate), wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "โรงกลั่น:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: document.querySelector(`#spn_refineries_id option[value='${spn_refineries_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "ผลิตภัณฑ์:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: document.querySelector(`#spn_products_id option[value='${spn_products_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "ตั๋ว:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: document.querySelector(`#spn_tickets_id option[value='${spn_tickets_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "น้ำหนัก:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: quantity, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "หน่วย:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: units, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "จังหวัด:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: province, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "อำเภอ:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: district, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "ตำบล:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: subDistrict, wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "sm",
+                  contents: [
+                    { type: "text", text: "วันที่ส่ง:", color: "#aaaaaa", size: "sm", flex: 2 },
+                    { type: "text", text: formatDate(targetDate), wrap: true, color: "#666666", size: "sm", flex: 4 }
+                  ]
+                },
+                {
+                  type: "separator",
+                  margin: "xl"
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  spacing: "md",
+                  contents: [
+                    {
+                      type: "button",
+                      style: "primary",
+                      color: "#007BFF",
+                      action: {
+                        type: "uri",
+                        label: "แก้ไข",
+                        uri: `https://consciencex.github.io/spn-order/?orderId=${currentOrderId}`
+                      }
+                    },
+                    {
+                      type: "button",
+                      style: "primary",
+                      color: "#FF0000",
+                      action: {
+                        type: "uri",
+                        label: "ลบ",
+                        uri: `https://consciencex.github.io/spn-order/?deleteOrderId=${currentOrderId}`
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        };
+
+        await liff.sendMessages([flexMessage]);
+        liff.closeWindow();
+
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to submit the order: ' + error.message);
+        document.getElementById('submitBtn').style.display = 'block';
+        document.getElementById('awaitIcon').style.display = 'none';
+      }
+    }
+
+    async function loadOrderData(orderId) {
+      try {
+        const response = await fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders/${orderId}`);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const order = await response.json();
+
+        document.getElementById('receiveDate').value = order.receiveDate;
+        document.getElementById('buyerName').value = order.buyerName;
+        document.getElementById('plant').value = order.plant;
+        document.getElementById('spn_refineries_id').value = order.spn_refineries_id;
+        document.getElementById('spn_products_id').value = order.spn_products_id;
+        document.getElementById('spn_tickets_id').value = order.spn_tickets_id;
+        document.getElementById('quantity').value = order.quantity;
+        document.getElementById('units').value = order.units;
+        document.getElementById('province').value = order.province;
+        populateDistricts();
+        document.getElementById('district').value = order.district;
+        populateSubDistricts();
+        document.getElementById('subDistrict').value = order.subDistrict;
+        document.getElementById('targetDate').value = order.targetDate;
+        document.getElementById('spn_customers_id').value = order.spn_customers_id || '';
+        document.getElementById('jobType').value = order.jobType || '0';
+
+        currentOrderId = orderId; // Set the current order ID
+      } catch (error) {
+        console.error('Error loading order data:', error);
+      }
+    }
+
+    function addOrderIdLabel(orderId) {
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'form-group';
+      labelDiv.innerHTML = `<label for="orderId">หมายเลขคำสั่ง:</label><p class="form-control">${orderId}</p>`;
+      const formContainer = document.querySelector('.form-container');
+      formContainer.insertBefore(labelDiv, formContainer.firstChild);
+    }
+
+    window.onload = async function() {
+      try {
+        document.getElementById('loading').style.display = 'block';
+        document.querySelector('.form-container').style.display = 'none';
+
+        await initializeLiff();
+
+        document.getElementById('loading').style.display = 'none';
+        document.querySelector('.form-container').style.display = 'block';
+
+      } catch (error) {
+        console.error('LIFF initialization failed', error);
+        alert('LIFF initialization failed: ' + error.message);
+        document.getElementById('loading').style.display = 'none';
+      }
+    };
+  </script>
+</head>
+<body>
+  <div class="title-container">
+    <h6>ห้างหุ้นส่วนจำกัด สุภาวินี ซัพพลาย</h6>
+    <h10>SUPAVINEE SUPPLY LIMITED PARTNERSHIP</h10>
+  </div>
+  <div id="loading" class="loading">
+    <p>โปรดรอสักครู่</p>
+  </div>
+  <div class="form-container">
+    <div class="profile-info">
+      <img id="profilePicture" alt="Profile Picture">
+      <p id="displayName"></p>
+      <p id="userId" style="display: none;"></p>
+    </div>
+    <form onsubmit="submitForm(); return false;">
+      <div class="form-group">
+        <label for="receiveDate">วันที่รับ:</label>
+        <input type="date" class="form-control" id="receiveDate" name="receiveDate" required>
+      </div>
+      <div class="form-group">
+        <label for="buyerName">ชื่อลูกค้า:</label>
+        <input type="text" class="form-control" id="buyerName" name="buyerName">
+      </div>
+      <div class="form-group">
+        <label for="plant">Plant:</label>
+        <input type="text" class="form-control" id="plant" name="plant">
+      </div>
+      <div class="form-group">
+        <label for="spn_refineries_id">โรงกลั่น:</label>
+        <select class="form-control" id="spn_refineries_id" name="spn_refineries_id"></select>
+      </div>
+      <div class="form-group">
+        <label for="spn_products_id">ผลิตภัณฑ์:</label>
+        <select class="form-control" id="spn_products_id" name="spn_products_id"></select>
+      </div>
+      <div class="form-group">
+        <label for="spn_tickets_id">ตั๋ว:</label>
+        <select class="form-control" id="spn_tickets_id" name="spn_tickets_id"></select>
+      </div>
+      <div class="form-group">
+        <label for="quantity">น้ำหนักบรรทุก:</label>
+        <input type="number" class="form-control" step="0.001" id="quantity" name="quantity">
+      </div>
+      <div class="form-group">
+        <label for="units">หน่วย:</label>
+        <select class="form-control" id="units" name="units">
+          <option value="ตัน">ตัน</option>
+          <option value="ลิตร">ลิตร</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="province">ปลายทางจังหวัด:</label>
+        <select class="form-control" id="province" name="province" onchange="populateDistricts()">
+          <option value="">เลือกจังหวัด</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="district">อำเภอ:</label>
+        <select class="form-control" id="district" name="district" onchange="populateSubDistricts()">
+          <option value="">เลือกอำเภอ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="subDistrict">ตำบล:</label>
+        <select class="form-control" id="subDistrict" name="subDistrict">
+          <option value="">เลือกตำบล</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="targetDate">วันที่ส่ง:</label>
+        <input type="date" class="form-control" id="targetDate" name="targetDate">
+      </div>
+      <!-- Hidden inputs for spn_customers_id and jobType -->
+      <input type="hidden" id="spn_customers_id" name="spn_customers_id">
+      <input type="hidden" id="jobType" name="jobType">
+      <input type="submit" class="btn btn-primary" id="submitBtn" value="ยืนยันคำสั่ง">
+    </form>
+    <div id="awaitIcon" class="await-icon">
+      <p>โปรดรอสักครู่...</p>
+      <div class="progress-bar">
+        <div class="progress-bar-inner"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
