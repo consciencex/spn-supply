@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>กรุณากรอกข้อมูลเพื่อยืนยันคำสั่ง</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Include Bootstrap CSS for styling (optional) -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <style>
+    /* Your existing styles */
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -78,32 +81,40 @@
       text-align: center;
       margin-top: 10px;
     }
+    .confirmation-message {
+      text-align: center;
+      font-size: 18px;
+      color: green;
+      margin-top: 20px;
+      display: none;
+    }
   </style>
+  <!-- Include LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
   <script>
     let provinceData;
     let currentOrderId = null; // Track the current order ID for edit functionality
+    const liffId = '2005786037-ZwX56JJQ'; // Replace with your LIFF ID
+
+    let refineryData = [];
+    let productData = [];
+    let ticketData = [];
 
     async function initializeLiff() {
       try {
-        await liff.init({ liffId: '2005786037-ZwX56JJQ' });
+        await liff.init({ liffId: liffId });
 
         if (!liff.isLoggedIn()) {
           liff.login();
         } else {
-          const permissionGranted = await liff.permission.query('profile');
-          if (!permissionGranted) {
-            await liff.permission.request('profile');
-          }
-
           // Fetch profile and proceed with form filling and other tasks
           const profile = await liff.getProfile();
           document.getElementById('displayName').textContent = profile.displayName;
           document.getElementById('profilePicture').src = profile.pictureUrl;
 
-          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_refinery', 'spn_refineries_id', 'refineryName');
-          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_products', 'spn_products_id', 'productName');
-          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_tickets', 'spn_tickets_id', 'ticketName');
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_refinery', 'spn_refineries_id', 'refineryName', refineryData);
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_products', 'spn_products_id', 'productName', productData);
+          await fetchDropdownData('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_tickets', 'spn_tickets_id', 'ticketName', ticketData);
           await fetchProvinceData();
 
           const urlParams = new URLSearchParams(window.location.search);
@@ -115,7 +126,6 @@
           } else {
             document.getElementById('submitBtn').value = 'ยืนยันคำสั่ง';
           }
-
         }
       } catch (error) {
         if (error.message === "The access token expired") {
@@ -129,13 +139,14 @@
       }
     }
 
-    async function fetchDropdownData(url, fieldId, key) {
+    async function fetchDropdownData(url, fieldId, key, dataArray) {
       try {
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
         const data = await response.json();
+        dataArray.push(...data);
         const select = document.getElementById(fieldId);
         data.forEach(item => {
           const option = document.createElement('option');
@@ -204,8 +215,24 @@
     }
 
     function formatDate(date) {
+      if (!date) return '';
       const options = { year: 'numeric', month: 'long', day: '2-digit' };
       return new Date(date).toLocaleDateString('th-TH', options);
+    }
+
+    function getRefineryName(id) {
+      const refinery = refineryData.find(item => item.id == id);
+      return refinery ? refinery.refineryName : '';
+    }
+
+    function getProductName(id) {
+      const product = productData.find(item => item.id == id);
+      return product ? product.productName : '';
+    }
+
+    function getTicketName(id) {
+      const ticket = ticketData.find(item => item.id == id);
+      return ticket ? ticket.ticketName : '';
     }
 
     async function submitForm() {
@@ -258,6 +285,7 @@
           jobType: jobType || "0"
         };
 
+        // Send data to Xano
         const url = currentOrderId 
           ? `https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders/${currentOrderId}` 
           : 'https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders';
@@ -282,175 +310,122 @@
           currentOrderId = result.result.id;
         }
 
-        const flexMessage = {
+        // After the request, fetch the updated data from Xano
+        let orderData;
+        if (currentOrderId) {
+          const orderResponse = await fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders/${currentOrderId}`);
+          if (!orderResponse.ok) {
+            throw new Error('Failed to fetch updated order data');
+          }
+          orderData = await orderResponse.json();
+        } else {
+          orderData = result.result; // For POST request, use result
+        }
+
+        // Build the flex message using orderData
+        let message = {
           type: "flex",
-          altText: "ยืนยันคำสั่งสำเร็จ !",
+          altText: "ข้อมูลคำสั่งของคุณ",
           contents: {
             type: "bubble",
             body: {
               type: "box",
               layout: "vertical",
-              contents: [
-                {
-                  type: "text",
-                  text: "ยืนยันคำสั่งสำเร็จ !",
-                  weight: "bold",
-                  size: "xl",
-                  margin: "md",
-                  align: "center"
-                },
-                {
-                  type: "text",
-                  text: "ข้อมูลพนักงานขนส่งและรถบรรทุก",
-                  size: "md",
-                  color: "#999999",
-                  margin: "md",
-                  align: "center"
-                },
-                {
-                  type: "text",
-                  text: "จะส่งให้ท่านภายใน 1-2 วันทำการ",
-                  size: "md",
-                  color: "#999999",
-                  margin: "xs",
-                  align: "center"
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "หมายเลข:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: `${currentOrderId}`, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "วันที่รับ:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: formatDate(receiveDate), wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "โรงกลั่น:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: document.querySelector(`#spn_refineries_id option[value='${spn_refineries_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "ผลิตภัณฑ์:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: document.querySelector(`#spn_products_id option[value='${spn_products_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "ตั๋ว:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: document.querySelector(`#spn_tickets_id option[value='${spn_tickets_id}']`).textContent, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "น้ำหนัก:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: quantity, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "หน่วย:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: units, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "จังหวัด:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: province, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "อำเภอ:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: district, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "ตำบล:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: subDistrict, wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "sm",
-                  contents: [
-                    { type: "text", text: "วันที่ส่ง:", color: "#aaaaaa", size: "sm", flex: 2 },
-                    { type: "text", text: formatDate(targetDate), wrap: true, color: "#666666", size: "sm", flex: 4 }
-                  ]
-                },
-                {
-                  type: "separator",
-                  margin: "xl"
-                },
-                {
-                  type: "box",
-                  layout: "horizontal",
-                  spacing: "md",
-                  contents: [
-                    {
-                      type: "button",
-                      style: "primary",
-                      color: "#007BFF",
-                      action: {
-                        type: "uri",
-                        label: "แก้ไข",
-                        uri: `https://consciencex.github.io/spn-order/?orderId=${currentOrderId}`
-                      }
-                    },
-                    {
-                      type: "button",
-                      style: "primary",
-                      color: "#FF0000",
-                      action: {
-                        type: "uri",
-                        label: "ลบ",
-                        uri: `https://consciencex.github.io/spn-order/?deleteOrderId=${currentOrderId}`
-                      }
-                    }
-                  ]
-                }
-              ]
+              contents: []
             }
           }
         };
 
-        await liff.sendMessages([flexMessage]);
+        let contentsArray = [
+          {
+            type: "text",
+            text: method === 'PATCH' ? "อัพเดตข้อมูลของคุณเรียบร้อยแล้ว" : "ยืนยันคำสั่งสำเร็จ !",
+            weight: "bold",
+            size: "xl",
+            margin: "md",
+            align: "center"
+          },
+          {
+            type: "text",
+            text: "ข้อมูลพนักงานขนส่งและรถบรรทุก",
+            size: "md",
+            color: "#999999",
+            margin: "md",
+            align: "center"
+          },
+          {
+            type: "text",
+            text: "จะส่งให้ท่านภายใน 1-2 วันทำการ",
+            size: "md",
+            color: "#999999",
+            margin: "xs",
+            align: "center"
+          }
+        ];
+
+        // Add fields from orderData
+        const fields = [
+          { label: "หมายเลข:", value: orderData.id },
+          { label: "วันที่รับ:", value: formatDate(orderData.receiveDate) },
+          { label: "ชื่อลูกค้า:", value: orderData.buyerName },
+          { label: "Plant:", value: orderData.plant },
+          { label: "โรงกลั่น:", value: getRefineryName(orderData.spn_refineries_id) },
+          { label: "ผลิตภัณฑ์:", value: getProductName(orderData.spn_products_id) },
+          { label: "ตั๋ว:", value: getTicketName(orderData.spn_tickets_id) },
+          { label: "น้ำหนัก:", value: orderData.quantity },
+          { label: "หน่วย:", value: orderData.units },
+          { label: "จังหวัด:", value: orderData.province },
+          { label: "อำเภอ:", value: orderData.district },
+          { label: "ตำบล:", value: orderData.subDistrict },
+          { label: "วันที่ส่ง:", value: formatDate(orderData.targetDate) }
+        ];
+
+        fields.forEach(field => {
+          contentsArray.push({
+            type: "box",
+            layout: "horizontal",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: field.label, color: "#aaaaaa", size: "sm", flex: 2 },
+              { type: "text", text: field.value, wrap: true, color: "#666666", size: "sm", flex: 4 }
+            ]
+          });
+        });
+
+        // Add the separator and button
+        contentsArray.push({
+          type: "separator",
+          margin: "xl"
+        });
+
+        contentsArray.push({
+          type: "box",
+          layout: "horizontal",
+          spacing: "md",
+          contents: [
+            {
+              type: "button",
+              style: "primary",
+              color: "#007BFF",
+              action: {
+                type: "uri",
+                label: "แก้ไข",
+                uri: `line://app/${liffId}?orderId=${orderData.id}`
+              }
+            }
+          ]
+        });
+
+        // Set the contents array to the message
+        message.contents.body.contents = contentsArray;
+
+        // Attempt to send the message and close the LIFF window
+        if (liff.isInClient() && liff.canSendMessages()) {
+          await liff.sendMessages([message]);
+        } else {
+          alert('ไม่สามารถส่งข้อความยืนยันได้ เนื่องจากไม่ได้เปิดในหน้าต่างแชท LINE');
+        }
+
         liff.closeWindow();
 
       } catch (error) {
@@ -520,7 +495,7 @@
 </head>
 <body>
   <div class="title-container">
-    <h6>ห้างหุ้นส่วนจำกัด สุภาวินี ซัพพลาย</h6>
+    <h6>ห้างหุ้นส่วนจำกัด สุภาวินี ซัพพลาย 2</h6>
     <h10>SUPAVINEE SUPPLY LIMITED PARTNERSHIP</h10>
   </div>
   <div id="loading" class="loading">

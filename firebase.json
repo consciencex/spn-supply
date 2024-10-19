@@ -1,10 +1,59 @@
 {
-  "hosting": {
-    "public": "Y",
+  "hosting": [{
+    "target": "order",
+    "public": ".",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index_order.html"
+      }
     ]
-  }
+  },{
+    "target": "driver_status",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index_driver_status.html"
+      }
+    ]
+  },{
+    "target": "po_input",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index_po_input.html"
+      }
+    ]
+  },{
+    "target": "tracking",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index_tracking.html"
+      }
+    ]
+  }]
 }

@@ -1,5 +1,27 @@
 {
   "projects": {
     "default": "spn-supply"
-  }
+  },
+  "targets": {
+    "spn-supply": {
+      "hosting": {
+        "DriverStatus": [
+          "spn-supply"
+        ],
+        "order": [
+          "spn-supply-order"
+        ],
+        "driver_status": [
+          "spn-supply-driver-status"
+        ],
+        "po_input": [
+          "spn-supply-po-input"
+        ],
+        "tracking": [
+          "spn-supply-tracking"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
