@@ -1,60 +1,285 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Input PO Number</title>
+  <title>Confirm PO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Include the LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+    }
+    h1 {
+      text-align: left;
+      font-size: 1.5em;
+    }
+    #orderNumberInput, #fetchData, #saveData {
+      display: block;
+      width: 90%;
+      max-width: 400px;
+      margin: 10px 0;
+      padding: 10px;
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+    #tableContainer {
+      width: 100%;
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      table-layout: fixed; /* Add this to fix table layout */
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      font-size: 0.9em;
+      text-align: left;
+      overflow: hidden; /* Add this to handle overflow */
+      text-overflow: ellipsis; /* Add this to show ellipsis for overflowed text */
+      white-space: nowrap; /* Prevent text wrapping */
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    /* Define column widths */
+    th:nth-child(1), td:nth-child(1) {
+      width: 25%; /* Driver Name column */
+    }
+    th:nth-child(2), td:nth-child(2) {
+      width: 20%; /* Truck No. column */
+    }
+    th:nth-child(3), td:nth-child(3) {
+      width: 12%; /* Size column */
+    }
+    th:nth-child(4), td:nth-child(4) {
+      width: 15%; /* Group column */
+    }
+    th:nth-child(5), td:nth-child(5) {
+      width: 28%; /* PO Number column */
+    }
+    /* Responsive adjustments */
+    @media screen and (max-width: 768px) {
+      table, th, td {
+        font-size: 0.8em;
+      }
+      th, td {
+        padding: 6px;
+      }
+      #orderNumberInput, #fetchData, #saveData {
+        width: 100%;
+        font-size: 0.9em;
+      }
+    }
+    @media screen and (max-width: 480px) {
+      table, th, td {
+        font-size: 0.7em;
+      }
+      th, td {
+        padding: 5px;
+      }
+      #orderNumberInput, #fetchData, #saveData {
+        padding: 10px;
+        font-size: 0.8em;
+      }
+      h1 {
+        font-size: 1.2em;
+      }
+    }
+    /* Styling input fields */
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+    /* Adjusting PO Number input field */
+    .po-number-input {
+      width: 100%; /* Adjusted to fill the cell */
+    }
+    /* Ensure the input fields are not too big on small screens */
+    @media screen and (max-width: 480px) {
+      input[type="text"] {
+        padding: 6px;
+        font-size: 0.9em;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Input PO Number</h1>
-  <button id="getProfile">Get Profile</button>
-  <button id="sendData">Send Data to Xano</button>
+  <h1>Confirm PO</h1>
+  <input type="text" id="orderNumberInput" placeholder="Enter Order Number">
+  <button id="fetchData">Fetch Data</button>
+  <button id="saveData" style="display:none;">Save Changes</button>
+  <div id="tableContainer"></div>
+
   <script>
     // Initialize LIFF app
-    document.addEventListener("DOMContentLoaded", function() {
-      liff.init({
-        liffId: "YOUR_LIFF_ID"
-      }).then(() => {
-        console.log('LIFF initialized');
-      }).catch(err => {
-        console.error('LIFF Initialization failed', err);
-      });
-    });
+    liff.init({
+      liffId: "2005786037-5wOeJLLa" // Use your LIFF ID
+    }).then(() => {
+      console.log('LIFF initialized');
 
-    // Get Profile
-    document.getElementById('getProfile').addEventListener('click', function() {
-      liff.getProfile().then(profile => {
-        alert('Hello, ' + profile.displayName);
-      }).catch(err => {
-        console.error('Error getting profile', err);
-      });
-    });
+      // Place your code that needs to run after LIFF initialization here
+      let data = []; // Declare data variable to hold fetched data
 
-    // Send Data to Xano
-    document.getElementById('sendData').addEventListener('click', function() {
-      liff.getProfile().then(profile => {
-        // Send data to Xano
-        fetch('https://YOUR_XANO_ENDPOINT_URL', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            userId: profile.userId,
-            displayName: profile.displayName
+      document.getElementById('fetchData').addEventListener('click', function() {
+        // Get the spn_order_id from the input field
+        const spn_order_id = document.getElementById('orderNumberInput').value.trim();
+
+        if (!spn_order_id) {
+          alert('Please enter an Order Number.');
+          return;
+        }
+
+        // Make a GET request to the Xano API with the spn_order_id as a query parameter
+        fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_orders_confirm?spn_order_id=${encodeURIComponent(spn_order_id)}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Error fetching data: ${response.statusText}`);
+            }
+            return response.json();
           })
-        }).then(response => response.json())
-          .then(data => {
-            alert('Data sent to Xano: ' + JSON.stringify(data));
+          .then(fetchedData => {
+            data = fetchedData; // Store fetched data in the global variable
+            // Create and display the table with selected columns
+            createTable(data);
+            // Show the Save button
+            document.getElementById('saveData').style.display = 'inline-block';
           })
           .catch(err => {
-            console.error('Error sending data to Xano', err);
+            console.error('Error fetching data', err);
+            document.getElementById('tableContainer').innerHTML = 'Error fetching data';
+            alert('Error fetching data. Please check the console for details.');
           });
-      }).catch(err => {
-        console.error('Error getting profile', err);
       });
+
+      document.getElementById('saveData').addEventListener('click', function() {
+        // Loop over each item in the data array
+        const promises = data.map(item => {
+          const payload = {
+            spn_order_confirm_po: item.poNumber // Ensure this matches the expected field name
+          };
+
+          // Send the updated data to the specified endpoint
+          return fetch(`https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_order_confirm_by_id?spn_order_confirm_id=${item.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+              // 'Authorization': 'Bearer YOUR_API_TOKEN' // Uncomment and replace if authentication is required
+            },
+            body: JSON.stringify(payload)
+          })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(errorData => {
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+              });
+            }
+            return response.json();
+          })
+          .then(result => {
+            console.log(`Data for ID ${item.id} updated successfully:`, result);
+          })
+          .catch(error => {
+            console.error(`Error updating data for ID ${item.id}:`, error);
+            alert(`Error updating data for ID ${item.id}: ${error.message}`);
+          });
+        });
+
+        // Wait for all PATCH requests to complete
+        Promise.all(promises)
+          .then(() => {
+            alert('All changes have been submitted successfully.');
+          })
+          .catch(() => {
+            alert('Some changes could not be saved. Please check the console for details.');
+          });
+      });
+
+      function createTable(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById('tableContainer').innerHTML = 'No data available';
+          return;
+        }
+
+        // Create table and header row
+        const table = document.createElement('table');
+        const headerRow = document.createElement('tr');
+
+        // Define the columns you want to display (ID column removed)
+        const columns = [
+          { label: 'Driver Name', key: 'driverName' },
+          { label: 'Truck No.', key: '_spn_trucks.truckNo' },
+          { label: 'Size', key: '_spn_trucks.truckSize' },
+          { label: 'Group', key: '_spn_trucks.truckGroup' },
+          { label: 'PO Number', key: 'poNumber', editable: true } // Mark this column as editable
+        ];
+
+        // Create header cells
+        columns.forEach(col => {
+          const th = document.createElement('th');
+          th.textContent = col.label;
+          headerRow.appendChild(th);
+        });
+        table.appendChild(headerRow);
+
+        // Create data rows
+        data.forEach((item, rowIndex) => {
+          const row = document.createElement('tr');
+
+          columns.forEach((col) => {
+            const td = document.createElement('td');
+            let value = '';
+
+            // Handle nested objects
+            if (col.key.includes('.')) {
+              const keys = col.key.split('.');
+              value = item;
+              keys.forEach(key => {
+                value = value ? value[key] : '';
+              });
+            } else {
+              value = item[col.key];
+            }
+
+            // If the column is editable, create an input box
+            if (col.editable) {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.value = value !== null && value !== undefined ? value : '';
+              input.name = `poNumber-${rowIndex}`; // Assign a unique name or ID if needed
+              input.maxLength = 20; // Limit input to 20 characters
+              input.classList.add('po-number-input'); // Add class for styling
+              input.dataset.rowIndex = rowIndex; // Store row index for future reference
+              input.addEventListener('input', function() {
+                // Update the data object when input value changes
+                item[col.key] = this.value;
+              });
+              td.appendChild(input);
+            } else {
+              // If value is null or undefined, set it to an empty string
+              td.textContent = value !== null && value !== undefined ? value : '';
+            }
+
+            row.appendChild(td);
+          });
+
+          table.appendChild(row);
+        });
+
+        // Append the table to the container
+        const container = document.getElementById('tableContainer');
+        container.innerHTML = ''; // Clear previous content
+        container.appendChild(table);
+      }
+    }).catch(err => {
+      console.error('LIFF Initialization failed', err);
     });
   </script>
 </body>
 </html>
-
