@@ -6,116 +6,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Include the LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <!-- Include Materialize CSS and icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <!-- Materialize JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js" defer></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 10px;
     }
     h1 {
-      text-align: left;
+      text-align: center;
       font-size: 1.5em;
     }
-    #orderNumberInput, #fetchData, #saveData {
-      display: block;
-      width: 90%;
-      max-width: 400px;
-      margin: 10px 0;
-      padding: 10px;
-      font-size: 1em;
-      box-sizing: border-box;
+    .input-field {
+      margin-top: 20px;
     }
-    #tableContainer {
-      width: 100%;
-      overflow-x: auto;
+    #cardContainer {
+      margin-top: 20px;
     }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-      table-layout: fixed; /* Add this to fix table layout */
+    .card-content p {
+      margin: 0;
     }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      font-size: 0.9em;
-      text-align: left;
-      overflow: hidden; /* Add this to handle overflow */
-      text-overflow: ellipsis; /* Add this to show ellipsis for overflowed text */
-      white-space: nowrap; /* Prevent text wrapping */
+    /* Positioning the Save Changes button */
+    #saveData {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
     }
-    th {
-      background-color: #f2f2f2;
-    }
-    /* Define column widths */
-    th:nth-child(1), td:nth-child(1) {
-      width: 25%; /* Driver Name column */
-    }
-    th:nth-child(2), td:nth-child(2) {
-      width: 20%; /* Truck No. column */
-    }
-    th:nth-child(3), td:nth-child(3) {
-      width: 12%; /* Size column */
-    }
-    th:nth-child(4), td:nth-child(4) {
-      width: 15%; /* Group column */
-    }
-    th:nth-child(5), td:nth-child(5) {
-      width: 28%; /* PO Number column */
-    }
-    /* Responsive adjustments */
+    /* Adjustments for smaller screens */
     @media screen and (max-width: 768px) {
-      table, th, td {
-        font-size: 0.8em;
+      h1 {
+        font-size: 1.4em;
       }
-      th, td {
-        padding: 6px;
-      }
-      #orderNumberInput, #fetchData, #saveData {
-        width: 100%;
-        font-size: 0.9em;
+      #saveData {
+        bottom: 15px;
+        right: 15px;
       }
     }
     @media screen and (max-width: 480px) {
-      table, th, td {
-        font-size: 0.7em;
-      }
-      th, td {
-        padding: 5px;
-      }
-      #orderNumberInput, #fetchData, #saveData {
-        padding: 10px;
-        font-size: 0.8em;
-      }
       h1 {
         font-size: 1.2em;
       }
-    }
-    /* Styling input fields */
-    input[type="text"] {
-      width: 100%;
-      padding: 8px;
-      font-size: 1em;
-      box-sizing: border-box;
-    }
-    /* Adjusting PO Number input field */
-    .po-number-input {
-      width: 100%; /* Adjusted to fill the cell */
-    }
-    /* Ensure the input fields are not too big on small screens */
-    @media screen and (max-width: 480px) {
-      input[type="text"] {
-        padding: 6px;
-        font-size: 0.9em;
+      #saveData {
+        bottom: 10px;
+        right: 10px;
       }
     }
   </style>
 </head>
 <body>
   <h1>Confirm PO</h1>
-  <input type="text" id="orderNumberInput" placeholder="Enter Order Number">
-  <button id="fetchData">Fetch Data</button>
-  <button id="saveData" style="display:none;">Save Changes</button>
-  <div id="tableContainer"></div>
+  <div class="row">
+    <div class="input-field col s12 m8">
+      <input id="orderNumberInput" type="text" placeholder="Enter Order Number">
+    </div>
+    <div class="col s12 m4">
+      <button id="fetchData" class="btn waves-effect waves-light">
+        Fetch Data
+        <i class="material-icons right">search</i>
+      </button>
+    </div>
+  </div>
+  <div id="cardContainer" class="row"></div>
+  <!-- Positioned Save Changes Button -->
+  <button id="saveData" class="btn waves-effect waves-light red" style="display: none;">
+    Save Changes
+    <i class="material-icons right">save</i>
+  </button>
 
   <script>
     // Initialize LIFF app
@@ -124,7 +84,6 @@
     }).then(() => {
       console.log('LIFF initialized');
 
-      // Place your code that needs to run after LIFF initialization here
       let data = []; // Declare data variable to hold fetched data
 
       document.getElementById('fetchData').addEventListener('click', function() {
@@ -132,7 +91,7 @@
         const spn_order_id = document.getElementById('orderNumberInput').value.trim();
 
         if (!spn_order_id) {
-          alert('Please enter an Order Number.');
+          M.toast({html: 'Please enter an Order Number.'});
           return;
         }
 
@@ -146,15 +105,15 @@
           })
           .then(fetchedData => {
             data = fetchedData; // Store fetched data in the global variable
-            // Create and display the table with selected columns
-            createTable(data);
+            // Create and display the cards with selected data
+            createCards(data);
             // Show the Save button
             document.getElementById('saveData').style.display = 'inline-block';
           })
           .catch(err => {
             console.error('Error fetching data', err);
-            document.getElementById('tableContainer').innerHTML = 'Error fetching data';
-            alert('Error fetching data. Please check the console for details.');
+            document.getElementById('cardContainer').innerHTML = '<p class="red-text">Error fetching data</p>';
+            M.toast({html: 'Error fetching data. Please check the console for details.'});
           });
       });
 
@@ -170,7 +129,6 @@
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json'
-              // 'Authorization': 'Bearer YOUR_API_TOKEN' // Uncomment and replace if authentication is required
             },
             body: JSON.stringify(payload)
           })
@@ -187,95 +145,97 @@
           })
           .catch(error => {
             console.error(`Error updating data for ID ${item.id}:`, error);
-            alert(`Error updating data for ID ${item.id}: ${error.message}`);
+            M.toast({html: `Error updating data for ID ${item.id}: ${error.message}`});
           });
         });
 
         // Wait for all PATCH requests to complete
         Promise.all(promises)
           .then(() => {
-            alert('All changes have been submitted successfully.');
+            M.toast({html: 'All changes have been submitted successfully.'});
           })
           .catch(() => {
-            alert('Some changes could not be saved. Please check the console for details.');
+            M.toast({html: 'Some changes could not be saved. Please check the console for details.'});
           });
       });
 
-      function createTable(data) {
+      function createCards(data) {
+        const cardContainer = document.getElementById('cardContainer');
+        cardContainer.innerHTML = ''; // Clear previous content
+
         if (!Array.isArray(data) || data.length === 0) {
-          document.getElementById('tableContainer').innerHTML = 'No data available';
+          cardContainer.innerHTML = '<p>No data available</p>';
           return;
         }
 
-        // Create table and header row
-        const table = document.createElement('table');
-        const headerRow = document.createElement('tr');
+        // Loop through each data item to create cards
+        data.forEach((item, index) => {
+          const col = document.createElement('div');
+          col.className = 'col s12 m6';
 
-        // Define the columns you want to display (ID column removed)
-        const columns = [
-          { label: 'Driver Name', key: 'driverName' },
-          { label: 'Truck No.', key: '_spn_trucks.truckNo' },
-          { label: 'Size', key: '_spn_trucks.truckSize' },
-          { label: 'Group', key: '_spn_trucks.truckGroup' },
-          { label: 'PO Number', key: 'poNumber', editable: true } // Mark this column as editable
-        ];
+          const card = document.createElement('div');
+          card.className = 'card';
 
-        // Create header cells
-        columns.forEach(col => {
-          const th = document.createElement('th');
-          th.textContent = col.label;
-          headerRow.appendChild(th);
-        });
-        table.appendChild(headerRow);
+          const cardContent = document.createElement('div');
+          cardContent.className = 'card-content';
 
-        // Create data rows
-        data.forEach((item, rowIndex) => {
-          const row = document.createElement('tr');
+          const cardTitle = document.createElement('span');
+          cardTitle.className = 'card-title';
+          cardTitle.textContent = `Driver: ${item.driverName || ''}`;
+          cardContent.appendChild(cardTitle);
 
-          columns.forEach((col) => {
-            const td = document.createElement('td');
-            let value = '';
+          // Extract nested fields
+          const truckNo = item._spn_trucks ? item._spn_trucks.truckNo : '';
+          const truckSize = item._spn_trucks ? item._spn_trucks.truckSize : '';
+          const truckGroup = item._spn_trucks ? item._spn_trucks.truckGroup : '';
 
-            // Handle nested objects
-            if (col.key.includes('.')) {
-              const keys = col.key.split('.');
-              value = item;
-              keys.forEach(key => {
-                value = value ? value[key] : '';
-              });
-            } else {
-              value = item[col.key];
-            }
+          const infoList = document.createElement('ul');
+          infoList.className = 'collection';
 
-            // If the column is editable, create an input box
-            if (col.editable) {
-              const input = document.createElement('input');
-              input.type = 'text';
-              input.value = value !== null && value !== undefined ? value : '';
-              input.name = `poNumber-${rowIndex}`; // Assign a unique name or ID if needed
-              input.maxLength = 20; // Limit input to 20 characters
-              input.classList.add('po-number-input'); // Add class for styling
-              input.dataset.rowIndex = rowIndex; // Store row index for future reference
-              input.addEventListener('input', function() {
-                // Update the data object when input value changes
-                item[col.key] = this.value;
-              });
-              td.appendChild(input);
-            } else {
-              // If value is null or undefined, set it to an empty string
-              td.textContent = value !== null && value !== undefined ? value : '';
-            }
+          const truckNoItem = document.createElement('li');
+          truckNoItem.className = 'collection-item';
+          truckNoItem.textContent = `Truck No.: ${truckNo}`;
+          infoList.appendChild(truckNoItem);
 
-            row.appendChild(td);
+          const truckSizeItem = document.createElement('li');
+          truckSizeItem.className = 'collection-item';
+          truckSizeItem.textContent = `Size: ${truckSize}`;
+          infoList.appendChild(truckSizeItem);
+
+          const truckGroupItem = document.createElement('li');
+          truckGroupItem.className = 'collection-item';
+          truckGroupItem.textContent = `Group: ${truckGroup}`;
+          infoList.appendChild(truckGroupItem);
+
+          cardContent.appendChild(infoList);
+
+          // Create input for PO Number
+          const poInputField = document.createElement('div');
+          poInputField.className = 'input-field';
+
+          const poInput = document.createElement('input');
+          poInput.type = 'text';
+          poInput.id = `poNumber-${index}`;
+          poInput.value = item.poNumber || '';
+          poInput.maxLength = 20;
+          poInput.addEventListener('input', function() {
+            // Update the data object when input value changes
+            item.poNumber = this.value;
           });
+          poInputField.appendChild(poInput);
 
-          table.appendChild(row);
+          const poLabel = document.createElement('label');
+          poLabel.setAttribute('for', `poNumber-${index}`);
+          poLabel.className = item.poNumber ? 'active' : '';
+          poLabel.textContent = 'PO Number';
+          poInputField.appendChild(poLabel);
+
+          cardContent.appendChild(poInputField);
+          card.appendChild(cardContent);
+
+          col.appendChild(card);
+          cardContainer.appendChild(col);
         });
-
-        // Append the table to the container
-        const container = document.getElementById('tableContainer');
-        container.innerHTML = ''; // Clear previous content
-        container.appendChild(table);
       }
     }).catch(err => {
       console.error('LIFF Initialization failed', err);
