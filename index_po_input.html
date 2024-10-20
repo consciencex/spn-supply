@@ -85,10 +85,12 @@
       console.log('LIFF initialized');
 
       let data = []; // Declare data variable to hold fetched data
+      let spn_order_id = ''; // Declare spn_order_id to store the order number
+      let isEditable = false; // Flag to determine if the screen is editable
 
       document.getElementById('fetchData').addEventListener('click', function() {
         // Get the spn_order_id from the input field
-        const spn_order_id = document.getElementById('orderNumberInput').value.trim();
+        spn_order_id = document.getElementById('orderNumberInput').value.trim();
 
         if (!spn_order_id) {
           M.toast({html: 'Please enter an Order Number.'});
@@ -105,10 +107,22 @@
           })
           .then(fetchedData => {
             data = fetchedData; // Store fetched data in the global variable
+
+            // Check if all orderStatus are 'Approved'
+            isEditable = data.every(item => item.orderStatus === 'Approved');
+
+            if (isEditable) {
+              M.toast({html: 'All orders are Approved. You can edit PO Numbers.'});
+              // Show the Save button
+              document.getElementById('saveData').style.display = 'inline-block';
+            } else {
+              M.toast({html: 'Some orders are not Approved. Editing is disabled.'});
+              // Hide the Save button
+              document.getElementById('saveData').style.display = 'none';
+            }
+
             // Create and display the cards with selected data
             createCards(data);
-            // Show the Save button
-            document.getElementById('saveData').style.display = 'inline-block';
           })
           .catch(err => {
             console.error('Error fetching data', err);
@@ -153,6 +167,43 @@
         Promise.all(promises)
           .then(() => {
             M.toast({html: 'All changes have been submitted successfully.'});
+
+            // Now check if all poNumbers are filled
+            const allPoNumbersFilled = data.every(item => item.poNumber && item.poNumber.trim() !== '');
+
+            if (allPoNumbersFilled) {
+              // If all PO Numbers are filled, send data via API to the specified URL
+              const payload = {
+                spn_order_id: spn_order_id
+              };
+              fetch('https://xlmj-nxdd-5lt7.s2.xano.io/api:F-P_0CWn/spn_order_confirm_po', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+              })
+              .then(response => {
+                if (!response.ok) {
+                  return response.json().then(errorData => {
+                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                  });
+                }
+                return response.json();
+              })
+              .then(result => {
+                console.log('Data sent successfully to spn_order_confirm_po:', result);
+                M.toast({html: 'All PO Numbers filled. Data sent successfully.'});
+                // Close the window
+                liff.closeWindow();
+              })
+              .catch(error => {
+                console.error('Error sending data to spn_order_confirm_po:', error);
+                M.toast({html: `Error sending data: ${error.message}`});
+              });
+            } else {
+              M.toast({html: 'Not all PO Numbers are filled. Please fill all before proceeding.'});
+            }
           })
           .catch(() => {
             M.toast({html: 'Some changes could not be saved. Please check the console for details.'});
@@ -188,6 +239,7 @@
           const truckNo = item._spn_trucks ? item._spn_trucks.truckNo : '';
           const truckSize = item._spn_trucks ? item._spn_trucks.truckSize : '';
           const truckGroup = item._spn_trucks ? item._spn_trucks.truckGroup : '';
+          const orderStatus = item.orderStatus || 'Unknown';
 
           const infoList = document.createElement('ul');
           infoList.className = 'collection';
@@ -207,6 +259,11 @@
           truckGroupItem.textContent = `Group: ${truckGroup}`;
           infoList.appendChild(truckGroupItem);
 
+          const orderStatusItem = document.createElement('li');
+          orderStatusItem.className = 'collection-item';
+          orderStatusItem.textContent = `Order Status: ${orderStatus}`;
+          infoList.appendChild(orderStatusItem);
+
           cardContent.appendChild(infoList);
 
           // Create input for PO Number
@@ -218,6 +275,7 @@
           poInput.id = `poNumber-${index}`;
           poInput.value = item.poNumber || '';
           poInput.maxLength = 20;
+          poInput.disabled = !isEditable; // Disable input if not editable
           poInput.addEventListener('input', function() {
             // Update the data object when input value changes
             item.poNumber = this.value;
